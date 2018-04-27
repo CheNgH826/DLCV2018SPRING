@@ -1,4 +1,4 @@
-from keras.layers import Input, Conv2D, MaxPooling2D, Conv2DTranspose, Activation, Reshape, Dense, Dropout, Flatten, UpSampling2D, BatchNormalization
+from keras.layers import Input, Conv2D, MaxPooling2D, Conv2DTranspose, Activation, Reshape, Dense, Dropout, Flatten, UpSampling2D, BatchNormalization, Add
 from keras.models import Model, load_model
 from keras.callbacks import ModelCheckpoint, History, EarlyStopping
 from keras.preprocessing.image import ImageDataGenerator
@@ -26,35 +26,40 @@ x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv2', 
 x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv3', trainable=trainable_or_not)(x)
 x = MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool')(x)
 
-x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv1', trainable=trainable_or_not)(x)
-x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv2', trainable=trainable_or_not)(x)
-x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv3', trainable=trainable_or_not)(x)
-x = MaxPooling2D((2, 2), strides=(2, 2), name='block4_pool')(x)
+s8 = Conv2D(lable_num, (1, 1), activation='relu', padding='same', name='8sforward')(x)
 
-x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv1', trainable=trainable_or_not)(x)
-x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv2', trainable=trainable_or_not)(x)
-x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv3', trainable=trainable_or_not)(x)
-x = MaxPooling2D((2, 2), strides=(2, 2), name='block5_pool')(x)
+y = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv1', trainable=trainable_or_not)(x)
+y = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv2', trainable=trainable_or_not)(y)
+y = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv3', trainable=trainable_or_not)(y)
+y = MaxPooling2D((2, 2), strides=(2, 2), name='block4_pool')(y)
 
-vgg_model = Model(img_input, x)
+s16 = Conv2D(lable_num, (1, 1), activation='relu', padding='same', name='16sforward')(y)
+
+z = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv1', trainable=trainable_or_not)(y)
+z = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv2', trainable=trainable_or_not)(z)
+z = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv3', trainable=trainable_or_not)(z)
+z = MaxPooling2D((2, 2), strides=(2, 2), name='block5_pool')(z)
+
+vgg_model = Model(img_input, z)
 weights_path = abs_path + 'vgg16_weights_tf_dim_ordering_tf_kernels.h5'
 vgg_model.load_weights(weights_path, by_name=True)
 # vgg_model.trainable = False
-x = Conv2D(4096, (2,2), activation='relu', padding='same', name='fc1')(x)
-x = Dropout(0.5)(x)
-x = Conv2D(4096, (1,1), activation='relu', padding='same', name='fc2')(x)
-x = Dropout(0.5)(x)
-x = Conv2D(lable_num, (1,1), activation='linear', padding='valid', kernel_initializer='he_normal')(x)
+z = Conv2D(4096, (7, 7), activation='relu', padding='same', name='fc1')(z)
+# x = Dropout(0.5)(x)
+z = Conv2D(4096, (1,1), activation='relu', padding='same', name='fc2')(z)
+# x = Dropout(0.5)(x)
+z = Conv2D(lable_num, (1,1), activation='linear', padding='valid', kernel_initializer='he_normal')(z)
 
-#x = UpSampling2D((2,2))(x)
-x = Conv2DTranspose(lable_num, kernel_size=64, strides=32, use_bias=False, activation='softmax', padding='same')(x)
-# x = Reshape((512*512, lable_num))(x)
-# x = Activation('softmax')(x)
-model = Model(img_input, x)
+z = Conv2DTranspose(lable_num, kernel_size=4, strides=2, use_bias=False, activation='linear', padding='same')(z)
+z = Add()([z, s16])
+z = Conv2DTranspose(lable_num, kernel_size=4, strides=2, use_bias=False, activation='linear', padding='same')(z)
+z = Add()([z, s8])
+z = Conv2DTranspose(lable_num, kernel_size=16, strides=8, use_bias=False, activation='softmax', padding='same')(z)
+# z = Activation('softmax')(z)
+model = Model(img_input, z)
 
-#model = load_model('/data/model/512trainable_model-06-0.37.h5')
+model = load_model('/mnt/8s_model-21-0.4248.h5')
 model.summary()
-# exit(-1)
 #optimizer = SGD(momentum=0.0, lr=1e-4)
 optimizer = Adam(lr=0.0001)
 model.compile(optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
@@ -74,14 +79,10 @@ print('train data loaded!')
 # print('train data loaded!')
 ######
 
-mode = '32s'
+mode = '8s2'
 print('training with mode '+mode)
-checkpointer = ModelCheckpoint(filepath='/mnt/'+mode+'_model-{epoch:02d}-{val_loss:.4f}.h5', verbose=0, save_best_only=True, period=2)
-# history = History()
-earlystopping = EarlyStopping(patience=10, min_delta=0.00)
+checkpointer = ModelCheckpoint(filepath='/mnt/'+mode+'_model-{epoch:02d}-{val_loss:.4f}-{val_acc:.3f}.h5', verbose=0, save_best_only=True, period=1)
+earlystopping = EarlyStopping(monitor='val_acc', patience=10, min_delta=0.00)
 model.fit(train_sat, train_label, batch_size=12, epochs=50, verbose=1, 
           validation_data=(val_sat, val_label),
           callbacks=[checkpointer, earlystopping])
-#model.save('/data/model/'+mode+'_model_final.h5')
-# pk.dump(history.history['loss'], open(abs_path+'model/history_train_loss.pickle', 'wb'))
-# pk.dump(history.history['val_loss'], open(abs_path+'model/history_val_loss.pickle', 'wb'))

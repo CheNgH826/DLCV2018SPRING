@@ -63,7 +63,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     labels = read_masks(args.labels)
-    np.save(ABS_PATH+'npy/train_masks_uint8.npy', labels)
-    train_data = read_img(args.train)
-    np.save(ABS_PATH+'npy/train_sat_uint8.npy', train_data)
+    np.save('npy/train_masks_uint8_64.npy', labels[:,::8,::8,:])
+    # train_data = read_img(args.train)
+    # np.save('/mnt/label/_sat_uint8_64.npy', train_data[:,::8,::8,:])
     
