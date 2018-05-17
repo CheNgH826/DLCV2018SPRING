@@ -2,9 +2,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 from acgan_model import Generator, Discriminator
 from torchvision.utils import save_image
-import torch
 import sys
 import os
+import torch
+import torch._utils
+from torch.autograd import Variable
+try:
+    torch._utils._rebuild_tensor_v2
+except AttributeError:
+    def _rebuild_tensor_v2(storage, storage_offset, size, stride, requires_grad, backward_hooks):
+        tensor = torch._utils._rebuild_tensor(storage, storage_offset, size, stride)
+        tensor.requires_grad = requires_grad
+        tensor._backward_hooks = backward_hooks
+        return tensor
+    torch._utils._rebuild_tensor_v2 = _rebuild_tensor_v2
 
 torch.manual_seed(2)
 # output_path = '/home/lilioo826/hw4_output/'
@@ -33,15 +44,15 @@ plt.plot(Dacc_real[::10], label='Real')
 plt.plot(Dacc_fake[::10], label='Fake')
 plt.legend()
 plt.title('Accuracy of Discriminator')
-plt.savefig(os.path.join(output_path, '/fig3_2.jpg'))
+plt.savefig(output_path+'/fig3_2.jpg')
 
 # fig3_3
 netG = Generator(64, 256)
 netG.load_state_dict(torch.load('ACGAN/acgan_netG.pth'))
-fix_noise = torch.randn(10, 256, 1, 1)
-fix_attr0 = torch.zeros(10, 1, 1, 1)
-fix_attr1 = torch.ones(10, 1, 1, 1)
+fix_noise = Variable(torch.randn(10, 256, 1, 1))
+fix_attr0 = Variable(torch.zeros(10, 1, 1, 1))
+fix_attr1 = Variable(torch.ones(10, 1, 1, 1))
 fake_0 = netG(fix_noise, fix_attr0)
 fake_1 = netG(fix_noise, fix_attr1)
 compare = torch.cat((fake_0, fake_1))
-save_image(compare, os.path.join(output_path, 'fig3_3.jpg'), nrow=10, normalize=True)
+save_image(compare.data, output_path+'/fig3_3.jpg', nrow=10, normalize=True)

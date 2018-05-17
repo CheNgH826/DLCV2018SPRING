@@ -2,9 +2,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 from gan_model import Generator, Discriminator
 from torchvision.utils import save_image
-import torch
 import sys
 import os
+import torch
+import torch._utils
+from torch.autograd import Variable
+try:
+    torch._utils._rebuild_tensor_v2
+except AttributeError:
+    def _rebuild_tensor_v2(storage, storage_offset, size, stride, requires_grad, backward_hooks):
+        tensor = torch._utils._rebuild_tensor(storage, storage_offset, size, stride)
+        tensor.requires_grad = requires_grad
+        tensor._backward_hooks = backward_hooks
+        return tensor
+    torch._utils._rebuild_tensor_v2 = _rebuild_tensor_v2
 
 torch.manual_seed(2)
 
@@ -31,11 +42,11 @@ plt.plot(Dx[::10], label='Real')
 plt.plot(DG1[::10], label='Fake')
 plt.legend()
 plt.title('mean of output of Discriminator')
-plt.savefig(os.path.join(output_path, 'fig2_2.jpg'))
+plt.savefig(output_path+'/fig2_2.jpg')
 
 # fig2_3
 netG = Generator(64, 256)
 netG.load_state_dict(torch.load('GAN/gan_netG.pth'))
-ran_vec = torch.randn(32, 256, 1, 1)
+ran_vec = Variable(torch.randn(32, 256, 1, 1))
 fake = netG(ran_vec)
-save_image(fake, os.path.join(output_path, 'fig2_3.jpg'), nrow=8, normalize=True)
+save_image(fake.data, output_path+'/fig2_3.jpg', nrow=8, normalize=True)
