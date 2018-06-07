@@ -15,7 +15,7 @@ model = load_model(model_path)
 val_data = read_img(data_path)
 # val_data = np.load('npy/val_sat_uint8.npy')
 sample_size = val_data.shape[0]
-batch_size = 128
+batch_size = 16
 val_result = []
 for idx in range(0, sample_size, batch_size):
     val_result_part = model.predict(val_data[idx: idx+batch_size])
